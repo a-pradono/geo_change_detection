@@ -21,9 +21,6 @@ submission/
 ├── report.md                    # full methodology, results, and interpretation
 ├── requirements.txt
 ├── .gitignore
-├── .vscode/
-│   └── settings.json             # pins Jupyter's working directory to submission/ (see below)
-├── aoi.geojson                   # copy of data/raw/aoi.geojson, at the path exploration.ipynb expects
 ├── data/
 │   ├── sentinel2_20230812/       # per-band B02/B03/B04.tif, at the path exploration.ipynb expects
 │   ├── sentinel2_20230902/       # (duplicates of data/raw/*.tif in per-band form -- see below)
@@ -126,10 +123,13 @@ cleanup (**551.45 ha**), **374** polygons.
 ## `notebooks/exploration.ipynb`
 
 This is the original interactive notebook the pipeline in `src/` was
-extracted from — code and markdown are unedited. It's kept primarily as
-evidence of the validation process behind the final design (the redesigned
-`src/` modules are the artifact intended for reuse), but it's also fully
-runnable in place. It shows the iterative work that `report.md` and `src/`
+extracted from. The analysis code and markdown are unedited; the only
+changes are to 2 cells' input paths (`DATA_DIR` and the AOI path, both now
+`../data/...`, see "Running the notebook" below) so it runs correctly in
+its committed location. It's kept primarily as evidence of the validation
+process behind the final design (the redesigned `src/` modules are the
+artifact intended for reuse), but it's also fully runnable in place. It
+shows the iterative work that `report.md` and `src/`
 summarize: histogram/noise-vs-signal checks on the change-magnitude
 distribution, cross-method agreement testing (band differencing vs. CVA vs.
 PCA classified the same pixels identically across all in-AOI pixels), and
@@ -149,30 +149,40 @@ cross-method agreement counts, smaller diagnostic plots) are untouched.
 
 ### Running the notebook
 
-The notebook's code (unedited) reads its inputs as `data/<date>/<band>.tif`
-and a bare `aoi.geojson`, not from `data/raw/` like `run_pipeline.py` does.
-To let it run in place without editing any cell, this repo also carries:
+Open and run it from inside `notebooks/` — its paths (`../data/...`) are
+relative to the notebook file's own directory, which is also VS Code's
+default Jupyter working directory (`${fileDirname}`), so it runs with
+**no extra configuration needed**. This repo carries the per-band imagery
+those paths need:
 - `data/sentinel2_20230812/` and `data/sentinel2_20230902/` (per-band
   B02/B03/B04 GeoTIFFs) — the same imagery as `data/raw/sentinel2_*.tif`,
-  just in the original per-band form the notebook expects.
-- `aoi.geojson` at the repo root — a copy of `data/raw/aoi.geojson`.
-- `.vscode/settings.json`, which pins Jupyter's working directory to
-  `submission/` (`jupyter.notebookFileRoot`) so these relative paths resolve
-  correctly even though the notebook file itself lives one level down in
-  `notebooks/`.
+  just in the original per-band form the notebook reads.
+- `data/raw/aoi.geojson` — read directly by the notebook via `../data/raw/aoi.geojson`.
 
-Verified end-to-end (`jupyter nbconvert --to notebook --execute`): all 39
-executable cells run with zero errors, reproducing the same validated result
-as `run_pipeline.py` (374 polygons, 551.45 ha).
+Verified end-to-end from `notebooks/` as the working directory
+(`jupyter nbconvert --to notebook --execute`, and confirmed interactively in
+VS Code): all 39 executable cells run with zero errors, reproducing the same
+validated result as `run_pipeline.py` (374 polygons, 551.45 ha).
 
-**Caveat:** the notebook writes its own outputs to `data/processed/` — the
-same folder `run_pipeline.py` uses — so running it interactively overwrites
-the committed `change_map.tif`/`change_binary.tif`/`change_polygons.gpkg`/
-`change_features.sqlite`. This was confirmed harmless (the notebook's own
-run reproduces the identical 374 polygons / 551.45 ha; only inconsequential
-binary details like embedded timestamps differ), but if you want the exact
-committed files back afterward, just re-run `run_pipeline.py` (see "How to
-run" above) or `git checkout -- data/processed/`.
+**Caveats:**
+- The notebook writes its own outputs to `../data/processed/` — the same
+  folder `run_pipeline.py` uses — so running it interactively overwrites the
+  committed `change_map.tif`/`change_binary.tif`/`change_polygons.gpkg`/
+  `change_features.sqlite`. Confirmed harmless (the notebook's own run
+  reproduces the identical 374 polygons / 551.45 ha; only inconsequential
+  binary details like embedded timestamps differ), but if you want the exact
+  committed files back afterward, just re-run `run_pipeline.py` (see "How to
+  run" above) or `git checkout -- data/processed/`.
+- The notebook's own SpatiaLite write (`change_features.sqlite`) uses a
+  simpler ad hoc schema (the GeoDataFrame's own columns: `id`, `date_before`,
+  `date_after`, `area_m2`, `confidence`, `geometry`) — **not** the schema
+  `src/db.py` builds (`id`, `detection_date_before`, `detection_date_after`,
+  `change_magnitude`, `area_sq_m`, `method`, `created_at`, `geom`, with a
+  spatial index). This is expected: the notebook is the original exploratory
+  code, `src/db.py` is the refined version. If you run the notebook, the
+  committed `change_features.sqlite` (produced by `src/db.py`/
+  `run_pipeline.py`) gets overwritten with the notebook's simpler schema —
+  restore it the same way as above if you need the original back.
 
 ## Notes on repo contents
 
@@ -180,11 +190,10 @@ run" above) or `git checkout -- data/processed/`.
   Sentinel-2 date rasters (~16 MB each), `change_features.sqlite` (~7 MB),
   and `notebooks/exploration.ipynb` (~14 MB, see above) are all small enough
   to check into git without Git LFS.
-- `data/sentinel2_20230812/`, `data/sentinel2_20230902/` (~31 MB total) and
-  the root-level `aoi.geojson` are the same source imagery/AOI as
-  `data/raw/`, duplicated in the original per-band layout so
-  `notebooks/exploration.ipynb` runs unmodified (see "Running the notebook"
-  above).
+- `data/sentinel2_20230812/` and `data/sentinel2_20230902/` (~31 MB total)
+  are the same source imagery as `data/raw/`, duplicated in the original
+  per-band layout so `notebooks/exploration.ipynb` runs unmodified (see
+  "Running the notebook" above).
 - `visualization_reports/html/dashboard.html` (~95 MB) is tracked with
   **Git LFS** (see `.gitattributes`). If you clone this repo, run
   `git lfs install` once beforehand so it checks out correctly instead of as

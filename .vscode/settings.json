@@ -1,6 +1,0 @@
-{
-    "jupyter.notebookFileRoot": "${workspaceFolder}",
-    "jupyter.runStartupCommands": [
-        "import os; os.chdir('..') if os.path.basename(os.getcwd()) == 'notebooks' else None"
-    ]
-}
